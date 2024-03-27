@@ -169,9 +169,11 @@ module CodeLens =
         | None -> return p |> success
         | Some symbol ->
             let! refs = wm.FindReferences symbol
-            // FIXME: refNum is wrong. There are lots of false positive even if we distinct locations by
-            // (l.Location.SourceTree.FilePath, l.Location.SourceSpan)
-            let refNum = refs |> Seq.map (fun r -> r.Locations |> Seq.length) |> Seq.fold (+) 0
+            let refNum =
+                refs
+                |> Seq.collect (fun r -> r.Locations)
+                |> Seq.distinctBy (fun l -> (l.Location.SourceTree.FilePath, l.Location.SourceSpan))
+                |> Seq.length
             let title = sprintf "%d Reference(s)" refNum
 
             let arg: ReferenceParams =
