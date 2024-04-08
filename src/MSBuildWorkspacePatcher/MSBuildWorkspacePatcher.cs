@@ -1,4 +1,7 @@
+using System.Reflection;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -31,6 +34,29 @@ class MSBuildWorkspaceSkipSaveDocumentText
     {
         // false means "don't call the original method"
         return false;
+    }
+}
+
+[HarmonyPatch]
+class ProjectRootElementSkipSave
+{
+    static MethodBase TargetMethod()
+    {
+        // RemoteProjectFile is an internal class;
+        var ty = typeof(MSBuildWorkspace).Assembly.GetType("Microsoft.CodeAnalysis.MSBuild.Rpc.RemoteProjectFile");
+        return
+            AccessTools.Method(ty, "SaveAsync");
+    }
+
+    static bool Prefix(CancellationToken cancellationToken)
+    {
+        // false means "don't call the original method"
+        return false;
+    }
+
+    static Task Postfix(Task task)
+    {
+        return Task.CompletedTask;
     }
 }
 
