@@ -103,7 +103,8 @@ module Util =
             (project: Microsoft.CodeAnalysis.Project)
             (metadataModule: IModuleSymbol)
             (fullName: string) = async {
-        let! compilation = project.GetCompilationAsync() |> Async.AwaitTask
+        let! ct = Async.CancellationToken
+        let! compilation = project.GetCompilationAsync(ct) |> Async.AwaitTask
         let reference = compilation.GetMetadataReference(metadataModule.ContainingAssembly)
         let peReference = reference :?> PortableExecutableReference |> Option.ofObj
         let assemblyLocation = peReference |> Option.map (fun r -> r.FilePath) |> Option.defaultValue "???"

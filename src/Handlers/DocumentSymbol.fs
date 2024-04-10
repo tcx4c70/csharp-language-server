@@ -318,9 +318,10 @@ module DocumentSymbol =
         match wm.GetDocument p.TextDocument.Uri with
         | None -> return None |> success
         | Some doc ->
-            let! semanticModel = doc.GetSemanticModelAsync() |> Async.AwaitTask
-            let! docText = doc.GetTextAsync() |> Async.AwaitTask
-            let! syntaxTree = doc.GetSyntaxTreeAsync() |> Async.AwaitTask
+            let! ct = Async.CancellationToken
+            let! semanticModel = doc.GetSemanticModelAsync(ct) |> Async.AwaitTask
+            let! docText = doc.GetTextAsync(ct) |> Async.AwaitTask
+            let! syntaxTree = doc.GetSyntaxTreeAsync(ct) |> Async.AwaitTask
 
             let collector = DocumentSymbolCollector(docText, semanticModel)
             collector.Init(doc.Name)

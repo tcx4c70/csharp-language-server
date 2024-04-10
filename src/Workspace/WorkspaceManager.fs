@@ -152,23 +152,32 @@ type WorkspaceManager(lspClient: ICSharpLspClient) =
         match this.GetDocument uri with
         | None -> return None
         | Some doc ->
-            let! sourceText = doc.GetTextAsync() |> Async.AwaitTask
+            let! ct = Async.CancellationToken
+            let! sourceText = doc.GetTextAsync(ct) |> Async.AwaitTask
             let position = Position.toRoslynPosition sourceText.Lines pos
-            let! symbol = SymbolFinder.FindSymbolAtPositionAsync(doc, position) |> Async.AwaitTask
+            let! symbol = SymbolFinder.FindSymbolAtPositionAsync(doc, position, ct) |> Async.AwaitTask
             return symbol |> Option.ofObj |> Option.map (fun sym -> sym, doc)
     }
 
-    member private this.FindDerivedClasses' (symbol: INamedTypeSymbol) (transitive: bool): Async<INamedTypeSymbol seq> =
-        workspaces.Values
-        |> Seq.map (fun workspace -> SymbolFinder.FindDerivedClassesAsync(symbol, workspace.CurrentSolution, transitive) |> Async.AwaitTask)
-        |> Async.Parallel
-        |> map (Seq.collect id)
+    member private this.FindDerivedClasses' (symbol: INamedTypeSymbol) (transitive: bool): Async<INamedTypeSymbol seq> = async {
+        let! ct = Async.CancellationToken
+        let! derivedClasses =
+            workspaces.Values
+            |> Seq.map (fun workspace -> SymbolFinder.FindDerivedClassesAsync(symbol, workspace.CurrentSolution, transitive, cancellationToken=ct) |> Async.AwaitTask)
+            |> Async.Parallel
+            |> map (Seq.collect id)
+        return derivedClasses
+    }
 
-    member private this.FindDerivedInterfaces' (symbol: INamedTypeSymbol) (transitive: bool):  Async<INamedTypeSymbol seq> =
-        workspaces.Values
-        |> Seq.map (fun workspace -> SymbolFinder.FindDerivedInterfacesAsync(symbol, workspace.CurrentSolution, transitive) |> Async.AwaitTask)
-        |> Async.Parallel
-        |> map (Seq.collect id)
+    member private this.FindDerivedInterfaces' (symbol: INamedTypeSymbol) (transitive: bool):  Async<INamedTypeSymbol seq> = async {
+        let! ct = Async.CancellationToken
+        let! derivedInterfaces =
+            workspaces.Values
+            |> Seq.map (fun workspace -> SymbolFinder.FindDerivedInterfacesAsync(symbol, workspace.CurrentSolution, transitive, cancellationToken=ct) |> Async.AwaitTask)
+            |> Async.Parallel
+            |> map (Seq.collect id)
+        return derivedInterfaces
+    }
 
     member private this.GetDiagnostics (uri: DocumentUri): Async<Diagnostic array> = async {
         match this.GetDocument uri with
@@ -248,7 +257,8 @@ type WorkspaceManager(lspClient: ICSharpLspClient) =
                 return decompiledMetadata.AddOrUpdate(uri, metadata, (fun _ _ -> metadata)).Document
             }
 
-        let! syntaxTree = doc.GetSyntaxTreeAsync() |> Async.AwaitTask
+        let! ct = Async.CancellationToken
+        let! syntaxTree = doc.GetSyntaxTreeAsync(ct) |> Async.AwaitTask
         let collector = DocumentSymbolCollectorForMatchingSymbolName(uri, symbol)
         collector.Visit(syntaxTree.GetRoot())
         match collector.GetLocations() with
@@ -308,37 +318,50 @@ type WorkspaceManager(lspClient: ICSharpLspClient) =
         override this.FindSymbol' (uri: DocumentUri) (pos: Position): Async<(ISymbol * Document) option> =
             this.FindSymbol' uri pos
 
-        override this.FindSymbols (pattern: string option): Async<ISymbol seq> =
+        override this.FindSymbols (pattern: string option): Async<ISymbol seq> = async {
+            let! ct = Async.CancellationToken
             let findTask =
                 match pattern with
                 | Some pat ->
-                    fun (sln: Solution) -> SymbolFinder.FindSourceDeclarationsWithPatternAsync(sln, pat, SymbolFilter.TypeAndMember)
+                    fun (sln: Solution) -> SymbolFinder.FindSourceDeclarationsWithPatternAsync(sln, pat, SymbolFilter.TypeAndMember, ct)
                 | None ->
-                    fun (sln: Solution) -> SymbolFinder.FindSourceDeclarationsAsync(sln, konst true, SymbolFilter.TypeAndMember)
-            workspaces.Values
-            |> Seq.map (fun workspace -> findTask workspace.CurrentSolution |> Async.AwaitTask)
-            |> Async.Parallel
-            |> map (Seq.collect id)
-
-        override this.FindReferences (symbol: ISymbol): Async<ReferencedSymbol seq> = async {
+                    fun (sln: Solution) -> SymbolFinder.FindSourceDeclarationsAsync(sln, konst true, SymbolFilter.TypeAndMember, ct)
             let! symbols =
                 workspaces.Values
-                |> Seq.map (fun workspace -> SymbolFinder.FindReferencesAsync(symbol, workspace.CurrentSolution) |> Async.AwaitTask)
+                |> Seq.map (fun workspace -> findTask workspace.CurrentSolution |> Async.AwaitTask)
+                |> Async.Parallel
+                |> map (Seq.collect id)
+            return symbols
+        }
+
+        override this.FindReferences (symbol: ISymbol): Async<ReferencedSymbol seq> = async {
+            let! ct = Async.CancellationToken
+            let! symbols =
+                workspaces.Values
+                |> Seq.map (fun workspace -> SymbolFinder.FindReferencesAsync(symbol, workspace.CurrentSolution, ct) |> Async.AwaitTask)
                 |> Async.Parallel
             return symbols |> Seq.collect id
         }
 
-        override this.FindImplementations (symbol: ISymbol): Async<ISymbol seq> =
-            workspaces.Values
-            |> Seq.map (fun workspace -> SymbolFinder.FindImplementationsAsync(symbol, workspace.CurrentSolution) |> Async.AwaitTask)
-            |> Async.Parallel
-            |> map (Seq.collect id)
+        override this.FindImplementations (symbol: ISymbol): Async<ISymbol seq> = async {
+            let! ct = Async.CancellationToken
+            let! impls =
+                workspaces.Values
+                |> Seq.map (fun workspace -> SymbolFinder.FindImplementationsAsync(symbol, workspace.CurrentSolution, cancellationToken=ct) |> Async.AwaitTask)
+                |> Async.Parallel
+                |> map (Seq.collect id)
+            return impls
+        }
 
-        override this.FindImplementations' (symbol: INamedTypeSymbol) (transitive: bool): Async<INamedTypeSymbol seq> =
-            workspaces.Values
-            |> Seq.map (fun workspace -> SymbolFinder.FindImplementationsAsync(symbol, workspace.CurrentSolution, transitive) |> Async.AwaitTask)
-            |> Async.Parallel
-            |> map (Seq.collect id)
+        override this.FindImplementations' (symbol: INamedTypeSymbol) (transitive: bool): Async<INamedTypeSymbol seq> = async {
+            let! ct = Async.CancellationToken
+            let! impls =
+                workspaces.Values
+                |> Seq.map (fun workspace -> SymbolFinder.FindImplementationsAsync(symbol, workspace.CurrentSolution, transitive, cancellationToken=ct) |> Async.AwaitTask)
+                |> Async.Parallel
+                |> map (Seq.collect id)
+            return impls
+        }
 
         override this.FindDerivedClasses (symbol: INamedTypeSymbol): Async<INamedTypeSymbol seq> = this.FindDerivedClasses' symbol true
         override this.FindDerivedClasses' (symbol: INamedTypeSymbol) (transitive: bool): Async<INamedTypeSymbol seq> = this.FindDerivedClasses' symbol transitive
@@ -347,9 +370,10 @@ type WorkspaceManager(lspClient: ICSharpLspClient) =
         override this.FindDerivedInterfaces' (symbol: INamedTypeSymbol) (transitive: bool):  Async<INamedTypeSymbol seq> = this.FindDerivedInterfaces' symbol transitive
 
         override this.FindCallers (symbol: ISymbol): Async<SymbolCallerInfo seq> = async {
+            let! ct = Async.CancellationToken
             let! symbols =
                 workspaces.Values
-                |> Seq.map (fun workspace -> SymbolFinder.FindCallersAsync(symbol, workspace.CurrentSolution) |> Async.AwaitTask)
+                |> Seq.map (fun workspace -> SymbolFinder.FindCallersAsync(symbol, workspace.CurrentSolution, ct) |> Async.AwaitTask)
                 |> Async.Parallel
             return symbols |> Seq.collect id
         }
@@ -397,7 +421,8 @@ type WorkspaceManager(lspClient: ICSharpLspClient) =
             | Some(workspace, docId) ->
                 let solution = workspace.CurrentSolution
                 let doc = solution.GetDocument(docId)
-                let! initialSourceText = doc.GetTextAsync() |> Async.AwaitTask
+                let! ct = Async.CancellationToken
+                let! initialSourceText = doc.GetTextAsync(ct) |> Async.AwaitTask
 
                 let applyChange (sourceText: SourceText) (change: Types.TextDocumentContentChangeEvent) =
                     match change.Range with

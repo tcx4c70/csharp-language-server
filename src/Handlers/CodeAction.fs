@@ -322,7 +322,8 @@ module CodeAction =
         match wm.GetDocument p.TextDocument.Uri with
         | None -> return None |> success
         | Some doc ->
-            let! docText = doc.GetTextAsync() |> Async.AwaitTask
+            let! ct = Async.CancellationToken
+            let! docText = doc.GetTextAsync(ct) |> Async.AwaitTask
             let textSpan = Range.toTextSpan docText.Lines p.Range
 
             let! roslynCodeActions = getRoslynCodeActions doc textSpan

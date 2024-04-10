@@ -46,8 +46,9 @@ module DocumentHighlight =
         // wm.FindSymbol & wm.FindReferences here.
         let getHighlights (symbol: ISymbol) (doc: Document) = async {
             let docSet = ImmutableHashSet.Create(doc)
-            let! refs = SymbolFinder.FindReferencesAsync(symbol, doc.Project.Solution, docSet) |> Async.AwaitTask
-            let! def = SymbolFinder.FindSourceDefinitionAsync(symbol, doc.Project.Solution) |> Async.AwaitTask
+            let! ct = Async.CancellationToken
+            let! refs = SymbolFinder.FindReferencesAsync(symbol, doc.Project.Solution, docSet, ct) |> Async.AwaitTask
+            let! def = SymbolFinder.FindSourceDefinitionAsync(symbol, doc.Project.Solution, ct) |> Async.AwaitTask
 
             let locations =
                 refs
@@ -66,9 +67,10 @@ module DocumentHighlight =
         match wm.GetDocument p.TextDocument.Uri with
         | None -> return None |> success
         | Some doc ->
-            let! sourceText = doc.GetTextAsync() |> Async.AwaitTask
+            let! ct = Async.CancellationToken
+            let! sourceText = doc.GetTextAsync(ct) |> Async.AwaitTask
             let position = Position.toRoslynPosition sourceText.Lines p.Position
-            let! symbol = SymbolFinder.FindSymbolAtPositionAsync(doc, position) |> Async.AwaitTask
+            let! symbol = SymbolFinder.FindSymbolAtPositionAsync(doc, position, ct) |> Async.AwaitTask
 
             match Option.ofObj symbol with
             | Some symbol when shouldHighlight symbol ->
