@@ -5,6 +5,7 @@ open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open Microsoft.CodeAnalysis.FindSymbols
 open Microsoft.CodeAnalysis.Rename
+open FSharpPlus
 open Ionide.LanguageServerProtocol.Server
 open Ionide.LanguageServerProtocol.Types
 open Ionide.LanguageServerProtocol.Types.LspResult
@@ -53,6 +54,7 @@ module Rename =
         |> Seq.collect (fun projectChange -> projectChange.GetChangedDocuments())
         |> Seq.map (getEdits originalSolution updatedSolution)
         |> Async.Parallel
+        |> map (Seq.distinct >> Array.ofSeq)
 
     let private dynamicRegistration (clientCapabilities: ClientCapabilities option) =
         clientCapabilities
