@@ -21,6 +21,7 @@
     <PackageReference Include="FSharpPlus" />
     <PackageReference Include="Ionide.LanguageServerProtocol" />
     <PackageReference Include="Microsoft.CodeAnalysis" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Features" />
     <PackageReference Include="System.Collections.Concurrent" />
   </ItemGroup>
 
