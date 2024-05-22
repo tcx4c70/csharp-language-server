@@ -15,6 +15,7 @@
     <Compile Include="Extensions.fs" />
     <Compile Include="ProgressReporter.fs" />
     <Compile Include="LruCache.fs" />
+    <Compile Include="Operators.fs" />
   </ItemGroup>
 
   <ItemGroup>
