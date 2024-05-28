@@ -82,7 +82,7 @@ module TextDocumentSync =
 
     let willSave (wm: IWorkspaceManager) (p: WillSaveTextDocumentParams): Async<unit> = ignoreNotification
 
-    let willSaveUntil (wm: IWorkspaceManager) (p: WillSaveTextDocumentParams): AsyncLspResult<TextEdit [] option> = notImplemented
+    let willSaveWaitUntil (wm: IWorkspaceManager) (p: WillSaveTextDocumentParams): AsyncLspResult<TextEdit [] option> = notImplemented
 
     let didSave (wm: IWorkspaceManager) (p: DidSaveTextDocumentParams): Async<unit> =
         wm.SaveDocument p.TextDocument.Uri p.Text

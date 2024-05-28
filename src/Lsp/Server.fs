@@ -110,7 +110,7 @@ type CSharpLspServer(lspClient: ICSharpLspClient, workspaceManager: IWorkspaceMa
 
         override this.TextDocumentWillSave(p) = workspaceManager.WaitInitialized() >-> TextDocumentSync.willSave workspaceManager p
 
-        override this.TextDocumentWillSaveWaitUntil(p) = workspaceManager.WaitInitialized() >-> TextDocumentSync.willSaveUntil workspaceManager p
+        override this.TextDocumentWillSaveWaitUntil(p) = workspaceManager.WaitInitialized() >-> TextDocumentSync.willSaveWaitUntil workspaceManager p
 
         override this.TextDocumentDidSave(p) = workspaceManager.WaitInitialized() >-> TextDocumentSync.didSave workspaceManager p
 
