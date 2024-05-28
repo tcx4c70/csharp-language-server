@@ -1,19 +1,75 @@
 namespace CSharpLanguageServer.Handlers
 
+open System
+open FSharpPlus
+open Ionide.LanguageServerProtocol.Server
 open Ionide.LanguageServerProtocol.Types
 
 open CSharpLanguageServer.Common.Types
 open CSharpLanguageServer.Common.LspUtil
 
 module TextDocumentSync =
-    let provider (clientCapabilities: ClientCapabilities option) : TextDocumentSyncOptions option =
-        Some
-            { TextDocumentSyncOptions.Default with
-                OpenClose = Some true
-                Save = Some { IncludeText = Some true }
-                Change = Some TextDocumentSyncKind.Incremental }
+    let private dynamicRegistration (clientCapabilities: ClientCapabilities option) =
+        clientCapabilities
+        >>= fun x -> x.TextDocument
+        >>= fun x -> x.Synchronization
+        >>= fun x -> x.DynamicRegistration
+        |> Option.defaultValue false
 
-    let registration (clientCapabilities: ClientCapabilities option) : Registration option = None
+    let provider (clientCapabilities: ClientCapabilities option) : TextDocumentSyncOptions option =
+        match dynamicRegistration clientCapabilities with
+        | true -> None
+        | false ->
+            Some
+                { TextDocumentSyncOptions.Default with
+                    OpenClose = Some true
+                    Save = Some { IncludeText = Some true }
+                    Change = Some TextDocumentSyncKind.Incremental }
+
+    let didOpenRegistration (clientCapabilities: ClientCapabilities option) : Registration option =
+        match dynamicRegistration clientCapabilities with
+        | false -> None
+        | true ->
+            Some
+                { Id = Guid.NewGuid().ToString()
+                  Method = "textDocument/didOpen"
+                  RegisterOptions = { DocumentSelector = Some defaultDocumentSelector } |> serialize |> Some }
+
+
+    let didChangeRegistration (clientCapabilities: ClientCapabilities option) : Registration option =
+        match dynamicRegistration clientCapabilities with
+        | false -> None
+        | true ->
+            Some
+                { Id = Guid.NewGuid().ToString()
+                  Method = "textDocument/didChange"
+                  RegisterOptions =
+                    { DocumentSelector = Some defaultDocumentSelector
+                      SyncKind = TextDocumentSyncKind.Incremental } |> serialize |> Some }
+
+    let didSaveRegistration (clientCapabilities: ClientCapabilities option) : Registration option =
+        match dynamicRegistration clientCapabilities with
+        | false -> None
+        | true ->
+            Some
+                { Id = Guid.NewGuid().ToString()
+                  Method = "textDocument/didSave"
+                  RegisterOptions =
+                    { DocumentSelector = Some defaultDocumentSelector
+                      IncludeText = Some true } |> serialize |> Some }
+
+    let didCloseRegistration (clientCapabilities: ClientCapabilities option) : Registration option =
+        match dynamicRegistration clientCapabilities with
+        | false -> None
+        | true ->
+            Some
+                { Id = Guid.NewGuid().ToString()
+                  Method = "textDocument/didClose"
+                  RegisterOptions = { DocumentSelector = Some defaultDocumentSelector } |> serialize |> Some }
+
+    let willSaveRegistration (clientCapabilities: ClientCapabilities option) : Registration option = None
+
+    let willSaveWaitUntilRegistration (clientCapabilities: ClientCapabilities option) : Registration option = None
 
     let didOpen (wm: IWorkspaceManager) (p: DidOpenTextDocumentParams): Async<unit> =
         wm.OpenDocument p.TextDocument.Uri p.TextDocument.Version p.TextDocument.Text

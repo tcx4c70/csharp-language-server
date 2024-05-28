@@ -69,7 +69,12 @@ module Util =
               SelectionRange.registration
               SemanticTokens.registration
               SignatureHelp.registration
-              TextDocumentSync.registration
+              TextDocumentSync.didOpenRegistration
+              TextDocumentSync.didChangeRegistration
+              TextDocumentSync.didSaveRegistration
+              TextDocumentSync.didCloseRegistration
+              TextDocumentSync.willSaveRegistration
+              TextDocumentSync.willSaveWaitUntilRegistration
               TypeDefinition.registration
               TypeHierarchy.registration
               DidChangeWatchedFiles.registration
